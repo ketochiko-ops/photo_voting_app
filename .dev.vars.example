@@ -1,0 +1,4 @@
+# Limits are non-secret configuration; never place access keys here.
+MAX_PHOTOS_PER_ROOM=200
+MAX_PHOTO_BYTES=5242880
+MAX_ROOM_BYTES=1073741824

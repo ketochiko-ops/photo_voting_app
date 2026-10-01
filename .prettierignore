@@ -1,0 +1,6 @@
+dist
+coverage
+node_modules
+playwright-report
+.wrangler
+package-lock.json
