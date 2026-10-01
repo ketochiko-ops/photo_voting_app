@@ -8,7 +8,7 @@ MAX_ROOM_BYTES = "1073741824"
 [[d1_databases]]
 binding = "DB"
 database_name = "photo-voting"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "d3250ca7-40dd-46ae-a3fd-e5f3aaeb3061"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "photo-voting-private"
