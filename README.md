@@ -30,7 +30,7 @@ FrontendはReact/Vite/Tailwind互換CSS/PWA、BackendはHono Worker、metadata�
 
 ## Local development
 
-Node.js 20以上とnpmを使用します。
+Node.js 22.13以上とnpmを使用します。
 
 ```bash
 npm install
