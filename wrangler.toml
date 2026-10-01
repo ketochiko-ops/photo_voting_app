@@ -1,0 +1,16 @@
+name = "photo-voting-api"
+main = "worker/index.ts"
+compatibility_date = "2024-10-22"
+[vars]
+MAX_PHOTOS_PER_ROOM = "200"
+MAX_PHOTO_BYTES = "5242880"
+MAX_ROOM_BYTES = "1073741824"
+[[d1_databases]]
+binding = "DB"
+database_name = "photo-voting"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "photo-voting-private"
+[triggers]
+crons = ["0 * * * *"]
