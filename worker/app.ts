@@ -7,7 +7,7 @@ import { authenticateRoom } from './services/authService';
 import { cleanupRoom } from './services/cleanupService';
 import type { Env, PhotoRow } from './types';
 import { createResultsCsv } from './utils/domain';
-import { validateImage } from './utils/image';
+import { sanitizeImage, validateImage, type SupportedMime } from './utils/image';
 import {
   generateAccessKey,
   generatePhotoId,
@@ -38,6 +38,13 @@ const genericAuthError = (c: Context<{ Bindings: Env; Variables: Variables }>) =
   c.json({ error: 'Access denied' }, 404);
 function validTitle(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 100;
+}
+async function voteCount(db: D1Database, roomId: string, photoId: string): Promise<number> {
+  const row = await db
+    .prepare('SELECT COUNT(*) count FROM votes WHERE room_id=? AND photo_id=?')
+    .bind(roomId, photoId)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
 }
 
 app.post('/api/rooms', async (c) => {
@@ -79,6 +86,29 @@ app.get('/api/rooms/:roomId', async (c) => {
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
     participantCount = await repo.participantCount(room.id);
+  const voteCounts = await c.env.DB.prepare(
+    'SELECT photo_id, COUNT(*) count FROM votes WHERE room_id=? GROUP BY photo_id',
+  )
+    .bind(room.id)
+    .all<{ photo_id: string; count: number }>();
+  const countsByPhoto = new Map(voteCounts.results.map((vote) => [vote.photo_id, vote.count]));
+  const participantToken = c.req.header('X-Participant-Token');
+  let myVotes = new Set<string>();
+  if (participantToken) {
+    const participant = await c.env.DB.prepare(
+      'SELECT id FROM participants WHERE room_id=? AND participant_token_hash=?',
+    )
+      .bind(room.id, await hashSecret(participantToken))
+      .first<{ id: string }>();
+    if (participant) {
+      const selected = await c.env.DB.prepare(
+        'SELECT photo_id FROM votes WHERE room_id=? AND participant_id=?',
+      )
+        .bind(room.id, participant.id)
+        .all<{ photo_id: string }>();
+      myVotes = new Set(selected.results.map((vote) => vote.photo_id));
+    }
+  }
   return c.json({
     id: room.id,
     title: room.title,
@@ -91,8 +121,8 @@ app.get('/api/rooms/:roomId', async (c) => {
       width: p.width,
       height: p.height,
       sortOrder: p.sort_order,
-      voteCount: 0,
-      votedByMe: false,
+      voteCount: countsByPhoto.get(p.id) ?? 0,
+      votedByMe: myVotes.has(p.id),
     })),
   });
 });
@@ -130,9 +160,12 @@ app.post('/api/rooms/:roomId/photos', async (c) => {
   const form = await c.req.formData();
   const file = form.get('photo');
   if (!(file instanceof File)) return c.json({ error: 'Invalid request' }, 400);
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  const uploadedBytes = new Uint8Array(await file.arrayBuffer());
+  let bytes: Uint8Array;
+  let mime: SupportedMime;
   try {
-    validateImage(bytes, file.type, Number(c.env.MAX_PHOTO_BYTES) || undefined);
+    mime = validateImage(uploadedBytes, file.type, Number(c.env.MAX_PHOTO_BYTES) || undefined);
+    bytes = sanitizeImage(uploadedBytes, mime);
   } catch {
     return c.json({ error: 'Invalid image' }, 400);
   }
@@ -150,7 +183,7 @@ app.post('/api/rooms/:roomId/photos', async (c) => {
     objectKey = `rooms/${room.id}/${id}.jpg`,
     order = (count?.count ?? 0) + 1;
   await c.env.PHOTOS.put(objectKey, bytes, {
-    httpMetadata: { contentType: file.type, cacheControl: 'private, no-store' },
+    httpMetadata: { contentType: mime, cacheControl: 'private, no-store' },
   });
   await c.env.DB.prepare(
     'INSERT INTO photos(id,room_id,object_key,original_filename,width,height,byte_size,sort_order,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
@@ -209,14 +242,16 @@ app.put('/api/rooms/:roomId/photos/:photoId/vote', async (c) => {
     await c.env.DB.prepare('DELETE FROM votes WHERE photo_id=? AND participant_id=?')
       .bind(photo.id, participant.id)
       .run();
-    return c.json({ voted: false });
+    const count = await voteCount(c.env.DB, room.id, photo.id);
+    return c.json({ voted: false, voteCount: count });
   }
   await c.env.DB.prepare(
     'INSERT INTO votes(room_id,photo_id,participant_id,created_at) VALUES(?,?,?,?)',
   )
     .bind(room.id, photo.id, participant.id, new Date().toISOString())
     .run();
-  return c.json({ voted: true });
+  const count = await voteCount(c.env.DB, room.id, photo.id);
+  return c.json({ voted: true, voteCount: count });
 });
 app.get('/api/rooms/:roomId/admin/results.csv', async (c) => {
   const { room, role } = await auth(c, 'admin');

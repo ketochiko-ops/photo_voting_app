@@ -2,19 +2,25 @@ import { useEffect, useState } from 'react';
 import type { RoomView } from '../../shared/types';
 import { PrivateImage } from '../components/PrivateImage';
 import { consumeFragment, participantToken } from '../lib/access';
-import { getRoom, joinRoom } from '../lib/api';
+import { getRoom, joinRoom, toggleVote } from '../lib/api';
 export function RoomPage({ roomId }: { roomId: string }) {
   const [room, setRoom] = useState<RoomView | null>(null),
     [error, setError] = useState(''),
+    [actionError, setActionError] = useState(''),
     [name, setName] = useState(''),
-    [needsName, setNeedsName] = useState(false);
+    [needsName, setNeedsName] = useState(false),
+    [voting, setVoting] = useState<string | null>(null);
   const access = consumeFragment(roomId);
   useEffect(() => {
     if (!access) {
       setError('参加URLまたは管理者URLからアクセスしてください');
       return;
     }
-    getRoom(roomId, access.key)
+    getRoom(
+      roomId,
+      access.key,
+      access.role === 'participant' ? participantToken(roomId) : undefined,
+    )
       .then((value) => {
         setRoom(value);
         if (value.role === 'participant' && !localStorage.getItem(`participant-name:${roomId}`))
@@ -28,6 +34,30 @@ export function RoomPage({ roomId }: { roomId: string }) {
     await joinRoom(roomId, access.key, name, participantToken(roomId));
     localStorage.setItem(`participant-name:${roomId}`, name);
     setNeedsName(false);
+  }
+  async function vote(photoId: string) {
+    if (!access || access.role !== 'participant' || needsName || voting) return;
+    setVoting(photoId);
+    setActionError('');
+    try {
+      const result = await toggleVote(roomId, photoId, access.key, participantToken(roomId));
+      setRoom((current) =>
+        current
+          ? {
+              ...current,
+              photos: current.photos.map((photo) =>
+                photo.id === photoId
+                  ? { ...photo, votedByMe: result.voted, voteCount: result.voteCount }
+                  : photo,
+              ),
+            }
+          : current,
+      );
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : '投票に失敗しました');
+    } finally {
+      setVoting(null);
+    }
   }
   if (error)
     return (
@@ -67,6 +97,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
         </div>
       )}
       <section className="grid">
+        {actionError && <p role="alert">{actionError}</p>}
         {room.photos.length === 0 ? (
           <div className="empty">
             <strong>まだ写真がありません</strong>
@@ -88,7 +119,13 @@ export function RoomPage({ roomId }: { roomId: string }) {
               <div>
                 <span>#{index + 1}</span>
                 <small>{photo.originalFilename}</small>
-                <button aria-pressed={photo.votedByMe}>♡ {photo.voteCount}</button>
+                <button
+                  aria-pressed={photo.votedByMe}
+                  disabled={room.role !== 'participant' || needsName || voting !== null}
+                  onClick={() => void vote(photo.id)}
+                >
+                  {photo.votedByMe ? '♥' : '♡'} {photo.voteCount}
+                </button>
               </div>
             </article>
           ))

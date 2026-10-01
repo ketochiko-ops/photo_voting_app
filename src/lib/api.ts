@@ -13,11 +13,36 @@ export async function createRoom(title: string, days: RetentionDays): Promise<Cr
     }),
   );
 }
-export async function getRoom(roomId: string, key: string): Promise<RoomView> {
+export async function getRoom(
+  roomId: string,
+  key: string,
+  participantToken?: string,
+): Promise<RoomView> {
   return parse(
     await fetch(`/api/rooms/${encodeURIComponent(roomId)}`, {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        ...(participantToken ? { 'X-Participant-Token': participantToken } : {}),
+      },
     }),
+  );
+}
+
+export async function toggleVote(
+  roomId: string,
+  photoId: string,
+  key: string,
+  participantToken: string,
+): Promise<{ voted: boolean; voteCount: number }> {
+  return parse(
+    await fetch(
+      `/api/rooms/${encodeURIComponent(roomId)}/photos/${encodeURIComponent(photoId)}/vote`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantToken }),
+      },
+    ),
   );
 }
 export async function joinRoom(
