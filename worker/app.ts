@@ -41,7 +41,7 @@ function validTitle(value: unknown): value is string {
 }
 
 app.post('/api/rooms', async (c) => {
-  const body = await c.req.json<{ title?: unknown; retentionDays?: unknown }>().catch(() => ({}));
+  const body: { title?: unknown; retentionDays?: unknown } = await c.req.json().catch(() => ({}));
   if (!validTitle(body.title) || !retentionDays.includes(body.retentionDays as RetentionDays))
     return c.json({ error: 'Invalid request' }, 400);
   const roomId = generateRoomId(),
@@ -69,7 +69,9 @@ app.post('/api/rooms', async (c) => {
   );
 });
 async function auth(c: Context<{ Bindings: Env; Variables: Variables }>, required?: 'admin') {
-  const room = await new RoomRepository(c.env.DB).find(c.req.param('roomId'));
+  const roomId = c.req.param('roomId');
+  if (!roomId) return { room: null, role: null };
+  const room = await new RoomRepository(c.env.DB).find(roomId);
   const role = await authenticateRoom(room, readBearer(c.req.header('Authorization')), required);
   return { room, role };
 }
@@ -99,8 +101,8 @@ app.get('/api/rooms/:roomId', async (c) => {
 app.post('/api/rooms/:roomId/participants', async (c) => {
   const { room, role } = await auth(c);
   if (!room || !role) return genericAuthError(c);
-  const body = await c.req
-    .json<{ displayName?: unknown; participantToken?: unknown }>()
+  const body: { displayName?: unknown; participantToken?: unknown } = await c.req
+    .json()
     .catch(() => ({}));
   if (
     !validTitle(body.displayName) ||
@@ -128,8 +130,10 @@ app.post('/api/rooms/:roomId/photos', async (c) => {
   const { room, role } = await auth(c, 'admin');
   if (!room || !role) return genericAuthError(c);
   const form = await c.req.formData();
-  const file = form.get('photo');
-  if (!(file instanceof File)) return c.json({ error: 'Invalid request' }, 400);
+  // Workers' FormData typing currently narrows entries to string even though
+  // uploaded multipart values are File objects at runtime.
+  const file = form.get('photo') as unknown as File | string | null;
+  if (!file || typeof file === 'string') return c.json({ error: 'Invalid request' }, 400);
   const bytes = new Uint8Array(await file.arrayBuffer());
   try {
     validateImage(bytes, file.type, Number(c.env.MAX_PHOTO_BYTES) || undefined);
@@ -189,7 +193,7 @@ app.get('/api/rooms/:roomId/photos/:photoId/content', async (c) => {
 app.put('/api/rooms/:roomId/photos/:photoId/vote', async (c) => {
   const { room, role } = await auth(c);
   if (!room || !role) return genericAuthError(c);
-  const body = await c.req.json<{ participantToken?: string }>().catch(() => ({}));
+  const body: { participantToken?: string } = await c.req.json().catch(() => ({}));
   if (!body.participantToken) return genericAuthError(c);
   const participant = await c.env.DB.prepare(
     'SELECT id FROM participants WHERE room_id=? AND participant_token_hash=?',
