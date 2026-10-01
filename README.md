@@ -35,7 +35,7 @@ Node.js 20以上とnpmを使用します。
 ```bash
 npm install
 cp .dev.vars.example .dev.vars
-npx wrangler d1 migrations apply photo-voting --local
+npm run db:migrate:local
 npm run dev:worker              # terminal 1, :8787
 npm run dev                     # terminal 2, Vite proxy
 ```
@@ -62,9 +62,9 @@ Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは
 1. Cloudflare Accountを用意し、`npx wrangler login`。
 2. `npx wrangler d1 create photo-voting` のIDを`wrangler.toml`へ設定。
 3. `npx wrangler r2 bucket create photo-voting-private`。Custom domain/public development URLを**設定しない**。
-4. `npx wrangler d1 migrations apply photo-voting --remote`。
+4. 手動でDBだけを更新する場合は`npm run db:migrate:remote`。通常は次の`npm run deploy`が、build、remote migration、Worker deployの順に実行する。
 5. 非秘密limitはvars、将来のsecretは`npx wrangler secret put NAME`で登録する。本物を`.dev.vars.example`へ書かない。
-6. `npm run deploy`でWorkerをdeploy。Cron `0 * * * *`は`wrangler.toml`から反映される。
+6. `npm run deploy`でmigrationとWorkerをdeploy。migrationが失敗した場合はWorkerを更新しない。Cron `0 * * * *`は`wrangler.toml`から反映される。
 7. R2 DashboardのLifecycle ruleでprefix `rooms/`、60日後deleteを設定する（アプリの最大30日 + cleanup安全margin 30日）。
 8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。`/api/*`はWorker route/custom domainへ接続する。
 9. Cloudflare WAF Rate Limitingで `/api/rooms`、認証、参加、写真、投票、AdminをIP単位で制限する。例として作成10/時、認証60/分、写真120/分を開始値とし、利用状況に合わせる。
