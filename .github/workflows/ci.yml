@@ -11,14 +11,8 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      # 本番へ反映する前に、空の D1 に全 migration を適用できることを検証する。
-      - run: npm run db:migrate:local
-      - run: npm run test:unit
-      - run: npm run test:integration
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm run build
+      # ローカルのコミット前検証と同じquality gateを実行する。
+      - run: npm run check
   deploy-worker:
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: quality

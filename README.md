@@ -43,6 +43,7 @@ npm run dev                     # terminal 2, Vite proxy
 Quality commands:
 
 ```bash
+npm run check               # GitHub Actionsのquality jobと同じコミット前検証
 npm run test
 npm run test:unit
 npm run test:integration
@@ -54,6 +55,8 @@ npm run format:check
 npm run typecheck
 npm run build
 ```
+
+`npm run check`はlocal D1 migration、Unit/Integration test、warningを許容しないlint、format、typecheck、Production buildを順に実行し、いずれかが失敗すると非0で終了します。E2Eはbrowser導入が必要なため、必要に応じて別途`npm run test:e2e`を実行します。
 
 Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは実ブラウザJourneyを担当します。TDDでは失敗testを先に追加し、最小実装、全test成功、refactorの順で進めます。
 

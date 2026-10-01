@@ -4,11 +4,11 @@ import { PrivateImage } from '../components/PrivateImage';
 import { consumeFragment, participantToken } from '../lib/access';
 import { getRoom, joinRoom } from '../lib/api';
 export function RoomPage({ roomId }: { roomId: string }) {
-  const [room, setRoom] = useState<RoomView | null>(null),
+  const [access] = useState(() => consumeFragment(roomId)),
+    [room, setRoom] = useState<RoomView | null>(null),
     [error, setError] = useState(''),
     [name, setName] = useState(''),
     [needsName, setNeedsName] = useState(false);
-  const access = consumeFragment(roomId);
   useEffect(() => {
     if (!access) {
       setError('参加URLまたは管理者URLからアクセスしてください');
@@ -21,7 +21,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
           setNeedsName(true);
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'ルームを利用できません'));
-  }, [roomId]);
+  }, [access, roomId]);
   async function join(e: React.FormEvent) {
     e.preventDefault();
     if (!access) return;
