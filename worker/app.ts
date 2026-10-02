@@ -41,6 +41,12 @@ function validTitle(value: unknown): value is string {
 }
 
 app.post('/api/rooms', async (c) => {
+  const clientIp = c.req.header('CF-Connecting-IP') ?? 'unknown';
+  const { success } = await c.env.ROOM_CREATION_RATE_LIMITER.limit({ key: clientIp });
+  if (!success) {
+    c.header('Retry-After', '60');
+    return c.json({ error: 'Too many requests' }, 429);
+  }
   const body: { title?: unknown; retentionDays?: unknown } = await c.req.json().catch(() => ({}));
   if (!validTitle(body.title) || !retentionDays.includes(body.retentionDays as RetentionDays))
     return c.json({ error: 'Invalid request' }, 400);

@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   PHOTOS: R2Bucket;
+  ROOM_CREATION_RATE_LIMITER: RateLimit;
   MAX_PHOTOS_PER_ROOM?: string;
   MAX_PHOTO_BYTES?: string;
   MAX_ROOM_BYTES?: string;
