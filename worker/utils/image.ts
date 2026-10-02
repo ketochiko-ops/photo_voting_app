@@ -25,7 +25,78 @@ export function validateImage(
   return detected;
 }
 
-/** Remove application/comment segments, including EXIF, XMP and ICC data, from a JPEG. */
+function readExifOrientation(segment: Uint8Array): number | null {
+  const exifSignature = [0x45, 0x78, 0x69, 0x66, 0, 0];
+  if (!exifSignature.every((byte, index) => segment[index] === byte)) return null;
+
+  const tiffOffset = exifSignature.length;
+  if (segment.length < tiffOffset + 8) return null;
+  const byteOrder = String.fromCharCode(segment[tiffOffset], segment[tiffOffset + 1]);
+  if (byteOrder !== 'II' && byteOrder !== 'MM') return null;
+  const littleEndian = byteOrder === 'II';
+  const view = new DataView(segment.buffer, segment.byteOffset, segment.byteLength);
+  if (view.getUint16(tiffOffset + 2, littleEndian) !== 42) return null;
+
+  const ifdOffset = tiffOffset + view.getUint32(tiffOffset + 4, littleEndian);
+  if (ifdOffset + 2 > segment.length) return null;
+  const entryCount = view.getUint16(ifdOffset, littleEndian);
+  if (ifdOffset + 2 + entryCount * 12 > segment.length) return null;
+  for (let index = 0; index < entryCount; index++) {
+    const entryOffset = ifdOffset + 2 + index * 12;
+    const tag = view.getUint16(entryOffset, littleEndian);
+    const type = view.getUint16(entryOffset + 2, littleEndian);
+    const count = view.getUint32(entryOffset + 4, littleEndian);
+    if (tag === 0x0112 && type === 3 && count === 1) {
+      const orientation = view.getUint16(entryOffset + 8, littleEndian);
+      return orientation >= 1 && orientation <= 8 ? orientation : null;
+    }
+  }
+  return null;
+}
+
+function orientationExifSegment(orientation: number): number[] {
+  // Rebuild EXIF from scratch so the only retained tag is the rendering-critical orientation.
+  return [
+    0xff,
+    0xe1,
+    0,
+    0x22,
+    0x45,
+    0x78,
+    0x69,
+    0x66,
+    0,
+    0,
+    0x49,
+    0x49,
+    0x2a,
+    0,
+    8,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0x12,
+    1,
+    3,
+    0,
+    1,
+    0,
+    0,
+    0,
+    orientation,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+  ];
+}
+
+/** Remove private JPEG metadata while retaining metadata required for faithful rendering. */
 function sanitizeJpeg(input: Uint8Array): Uint8Array {
   const output: number[] = [0xff, 0xd8];
   let offset = 2;
@@ -47,8 +118,18 @@ function sanitizeJpeg(input: Uint8Array): Uint8Array {
     const length = (input[offset] << 8) | input[offset + 1];
     const end = offset + length;
     if (length < 2 || end > input.length) throw new Error('INVALID_IMAGE');
-    const isMetadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
-    if (!isMetadata) appendBytes(output, input.slice(markerStart, end));
+    const segment = input.slice(offset + 2, end);
+    const app0Signature = new TextDecoder().decode(segment.slice(0, 5));
+    const isJfif = marker === 0xe0 && (app0Signature === 'JFIF\0' || app0Signature === 'JFXX\0');
+    const isIccProfile =
+      marker === 0xe2 && new TextDecoder().decode(segment.slice(0, 12)) === 'ICC_PROFILE\0';
+    const isAdobeColorTransform =
+      marker === 0xee && new TextDecoder().decode(segment.slice(0, 5)) === 'Adobe';
+    const isRenderingSegment = isJfif || isIccProfile || isAdobeColorTransform;
+    const orientation = marker === 0xe1 ? readExifOrientation(segment) : null;
+    if (orientation !== null) appendBytes(output, orientationExifSegment(orientation));
+    else if (isRenderingSegment || !((marker >= 0xe0 && marker <= 0xef) || marker === 0xfe))
+      appendBytes(output, input.slice(markerStart, end));
     offset = end;
     if (marker === 0xda) {
       // Copy compressed scan bytes until the next non-stuffed, non-restart marker.

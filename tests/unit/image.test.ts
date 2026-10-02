@@ -39,6 +39,108 @@ describe('image validation', () => {
     ]);
   });
 
+  it('retains only the EXIF orientation needed to render JPEG pixels correctly', () => {
+    const privateExif = new Uint8Array([
+      0xff,
+      0xd8,
+      0xff,
+      0xe1,
+      0,
+      0x33,
+      ...new TextEncoder().encode('Exif\0\0'),
+      0x49,
+      0x49,
+      0x2a,
+      0,
+      8,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0x12,
+      1,
+      3,
+      0,
+      1,
+      0,
+      0,
+      0,
+      6,
+      0,
+      0,
+      0,
+      0x0f,
+      1,
+      2,
+      0,
+      5,
+      0,
+      0,
+      0,
+      38,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      ...new TextEncoder().encode('Alice'),
+      0xff,
+      0xd9,
+    ]);
+
+    const sanitized = sanitizeImage(privateExif, 'image/jpeg');
+    expect(Array.from(sanitized)).toEqual([
+      0xff,
+      0xd8,
+      0xff,
+      0xe1,
+      0,
+      0x22,
+      ...new TextEncoder().encode('Exif\0\0'),
+      0x49,
+      0x49,
+      0x2a,
+      0,
+      8,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0x12,
+      1,
+      3,
+      0,
+      1,
+      0,
+      0,
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0xff,
+      0xd9,
+    ]);
+    expect(new TextDecoder().decode(sanitized)).not.toContain('Alice');
+  });
+
+  it('retains JPEG color rendering segments but removes unrelated application data', () => {
+    const segment = (marker: number, data: number[]) => [0xff, marker, 0, data.length + 2, ...data];
+    const icc = segment(0xe2, [...new TextEncoder().encode('ICC_PROFILE\0'), 1, 1, 42]);
+    const privateApp = segment(0xed, [...new TextEncoder().encode('private')]);
+    const jpeg = new Uint8Array([0xff, 0xd8, ...icc, ...privateApp, 0xff, 0xd9]);
+
+    expect(Array.from(sanitizeImage(jpeg, 'image/jpeg'))).toEqual([0xff, 0xd8, ...icc, 0xff, 0xd9]);
+  });
+
   it('removes PNG textual metadata chunks', () => {
     const chunk = (type: string, data: number[]) => [
       0,
