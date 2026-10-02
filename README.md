@@ -70,7 +70,7 @@ Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは
 5. 非秘密limitはvars、将来のsecretは`npx wrangler secret put NAME`で登録する。本物を`.dev.vars.example`へ書かない。
 6. `npm run deploy`でmigrationとWorkerをdeploy。migrationが失敗した場合はWorkerを更新しない。Cron `0 * * * *`は`wrangler.toml`から反映される。
 7. R2 DashboardのLifecycle ruleでprefix `rooms/`、60日後deleteを設定する（アプリの最大30日 + cleanup安全margin 30日）。
-8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。`/api/*`はWorker route/custom domainへ接続する。
+8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。PagesのProduction環境に変数名`API`、Service `photo-voting-api`のService bindingを追加する。`functions/api/[[path]].ts`が`/api/*`をsame-originでWorkerへ中継する。
 9. Cloudflare WAF Rate Limitingで `/api/rooms`、認証、参加、写真、投票、AdminをIP単位で制限する。例として作成10/時、認証60/分、写真120/分を開始値とし、利用状況に合わせる。
 
 `develop` push/mergeがProduction deploy、PRとその他branchはPages Previewです。GitHub Environmentにもproduction branch ruleとして`develop`だけを許可します。RollbackはCloudflare Deploymentsから直前versionを選び、D1は前方互換migrationを原則とします。破壊的変更はexpand/migrate/contractに分けます。

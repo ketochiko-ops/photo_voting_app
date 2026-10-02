@@ -44,7 +44,7 @@ Cloudflare Dashboardの **Workers & Pages**からGit repositoryを接続し、�
 
 ### 3. `/api/*`用Pages Functionを追加する
 
-本番反映時には、repositoryへ`functions/api/[[path]].ts`を追加し、Service bindingへリクエストを渡す。
+Repositoryの`functions/api/[[path]].ts`が、Service bindingへリクエストをそのまま渡す。
 
 ```ts
 interface Env {
@@ -64,7 +64,7 @@ Cloudflare DashboardのPagesプロジェクトで **Settings** → **Bindings** 
 
 Preview環境でもAPIを試す場合は、Preview側にもbindingを明示的に設定する。本番データとの混在を避けるには、Preview専用Worker・D1・R2を別途用意する。
 
-> このFunctionは現在のrepositoryには未実装である。実装・test・deploy設定を別作業として行ってから公開すること。
+`API` bindingが未設定だと`/api/*`は失敗するため、Productionへの公開前に必ず設定する。FunctionはAPI URL、認証header、request bodyを変更せずに転送し、Worker側の既存の認証・容量制限・`Cache-Control`を維持する。
 
 ### 4. 動作を確認する
 
