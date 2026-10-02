@@ -66,7 +66,23 @@ Preview環境でもAPIを試す場合は、Preview側にもbindingを明示的�
 
 > このFunctionは現在のrepositoryには未実装である。実装・test・deploy設定を別作業として行ってから公開すること。
 
-### 4. 動作を確認する
+### 4. Room作成のレート制限を設定する
+
+`pages.dev`と`workers.dev`は利用者が管理するCloudflare Zoneではないため、これらのhostnameにZoneのWAF Rate Limiting ruleを設定することはできない。そこで、公開前にWorkerのRate Limiting bindingを必ずdeployする。このrepositoryでは`wrangler.toml`の`ROOM_CREATION_RATE_LIMITER`を`5 requests / 60 seconds`に設定し、認証不要の`POST /api/rooms`を`CF-Connecting-IP`単位で制限している。上限超過時は`429 Too Many Requests`と`Retry-After: 60`を返す。
+
+```toml
+[[unsafe.bindings]]
+name = "ROOM_CREATION_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 60 }
+```
+
+`namespace_id`は同一account内でbindingごとに一意な整数文字列にする。Service binding経由でも実行先Workerのbindingが適用されるため、Pages Functionへ同じbindingを追加する必要はない。Rate Limiting APIはローカル開発では正確に再現されないため、deploy後に連続してRoomを作成し、6回目が`429`になることを確認する。
+
+ZoneのWAFを利用できる独自ドメインへの移行後も、このWorker側の制限を多層防御として維持する。Room作成以外のendpointには、READMEと`docs/design.md`に記載したWAFルールを追加する。
+
+### 5. 動作を確認する
 
 少なくとも次を確認する。
 
@@ -75,6 +91,7 @@ Preview環境でもAPIを試す場合は、Preview側にもbindingを明示的�
 3. Room作成、参加、画像表示、投票、削除が動作する。
 4. APIレスポンスおよび画像に意図した`Cache-Control`が付く。
 5. `workers.dev` URLを直接開いても、鍵なしでRoom情報や画像を取得できない。
+6. 同じ接続元から60秒以内にRoom作成を6回試し、6回目が`429`になり、60秒後に再び作成できる。
 
 ## 代替案
 
@@ -107,7 +124,7 @@ Service bindingによるsame-origin構成を維持すれば、FrontendのAPI URL
 - 無料なのはドメインの**所有**ではなく、Cloudflareサービス配下のホスト名利用である。
 - `pages.dev`のプロジェクト名や`workers.dev`のaccount subdomainは、希望名を必ず取得できるとは限らない。
 - Free planにはリクエスト数、build回数、CPU、D1、R2などの上限がある。公開前にDashboardのUsageと現行の料金ページを確認する。
-- `pages.dev`を本番相当で使う場合も、推測困難な鍵、非公開R2、WAF/Rate Limiting、期限切れ削除など、既存のsecurity要件は省略しない。
+- `pages.dev`を本番相当で使う場合も、推測困難な鍵、非公開R2、WorkerのRate Limiting binding、期限切れ削除など、適用可能なsecurity要件は省略しない。Zone WAFが必要な要件は独自ドメインへ移行するまで満たせないため、無料hostnameでの運用は暫定公開に限定する。
 - `workers.dev` routeは疎通確認には便利だが、不要になったら無効化を検討する。無効化前にPagesのService bindingが引き続き動作することを確認する。
 
 ## 公式資料
@@ -117,6 +134,7 @@ Service bindingによるsame-origin構成を維持すれば、FrontendのAPI URL
 - [Cloudflare Pages Functions: Bindings](https://developers.cloudflare.com/pages/functions/bindings/)
 - [Cloudflare Pages Functions: Routing](https://developers.cloudflare.com/pages/functions/routing/)
 - [Cloudflare Workers: `workers.dev`](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)
+- [Cloudflare Workers: Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
 - [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/)
 - [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
 
