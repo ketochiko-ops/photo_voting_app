@@ -27,6 +27,7 @@ FrontendはReact/Vite/Tailwind互換CSS/PWA、BackendはHono Worker、metadata�
 - `migrations/`: versioned D1 schema
 - `tests/unit`, `tests/integration`, `tests/e2e`: 分離したtest layers
 - `docs/design.md`: API、security、cleanup判断
+- `docs/free-domain-setup.md`: 無料の`pages.dev`ホスト名による暫定公開手順と独自ドメイン移行方針
 
 ## Local development
 
