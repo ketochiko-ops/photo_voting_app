@@ -96,6 +96,15 @@ function orientationExifSegment(orientation: number): number[] {
   ];
 }
 
+function sanitizedJfifSegment(segment: Uint8Array): number[] | null {
+  const jfifSignature = [0x4a, 0x46, 0x49, 0x46, 0];
+  // A JFIF header has 12 bytes of signature, version, units, and density before
+  // its two thumbnail dimensions. Do not retain the optional RGB thumbnail.
+  if (segment.length < 14 || !jfifSignature.every((byte, index) => segment[index] === byte))
+    return null;
+  return [0xff, 0xe0, 0, 0x10, ...segment.slice(0, 12), 0, 0];
+}
+
 /** Remove private JPEG metadata while retaining metadata required for faithful rendering. */
 function sanitizeJpeg(input: Uint8Array): Uint8Array {
   const output: number[] = [0xff, 0xd8];
@@ -119,15 +128,15 @@ function sanitizeJpeg(input: Uint8Array): Uint8Array {
     const end = offset + length;
     if (length < 2 || end > input.length) throw new Error('INVALID_IMAGE');
     const segment = input.slice(offset + 2, end);
-    const app0Signature = new TextDecoder().decode(segment.slice(0, 5));
-    const isJfif = marker === 0xe0 && (app0Signature === 'JFIF\0' || app0Signature === 'JFXX\0');
+    const jfif = marker === 0xe0 ? sanitizedJfifSegment(segment) : null;
     const isIccProfile =
       marker === 0xe2 && new TextDecoder().decode(segment.slice(0, 12)) === 'ICC_PROFILE\0';
     const isAdobeColorTransform =
       marker === 0xee && new TextDecoder().decode(segment.slice(0, 5)) === 'Adobe';
-    const isRenderingSegment = isJfif || isIccProfile || isAdobeColorTransform;
+    const isRenderingSegment = isIccProfile || isAdobeColorTransform;
     const orientation = marker === 0xe1 ? readExifOrientation(segment) : null;
     if (orientation !== null) appendBytes(output, orientationExifSegment(orientation));
+    else if (jfif !== null) appendBytes(output, jfif);
     else if (isRenderingSegment || !((marker >= 0xe0 && marker <= 0xef) || marker === 0xfe))
       appendBytes(output, input.slice(markerStart, end));
     offset = end;
