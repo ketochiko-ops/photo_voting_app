@@ -141,6 +141,22 @@ describe('image validation', () => {
     expect(Array.from(sanitizeImage(jpeg, 'image/jpeg'))).toEqual([0xff, 0xd8, ...icc, 0xff, 0xd9]);
   });
 
+  it('retains JFIF rendering fields without APP0 thumbnails or JFXX extensions', () => {
+    const segment = (data: number[]) => [0xff, 0xe0, 0, data.length + 2, ...data];
+    const jfifHeader = [...new TextEncoder().encode('JFIF\0'), 1, 2, 1, 0, 72, 0, 72];
+    const jfifWithThumbnail = segment([...jfifHeader, 1, 1, 10, 20, 30]);
+    const jfxx = segment([...new TextEncoder().encode('JFXX\0'), 0x10, 1, 2, 3]);
+    const jpeg = new Uint8Array([0xff, 0xd8, ...jfifWithThumbnail, ...jfxx, 0xff, 0xd9]);
+
+    expect(Array.from(sanitizeImage(jpeg, 'image/jpeg'))).toEqual([
+      0xff,
+      0xd8,
+      ...segment([...jfifHeader, 0, 0]),
+      0xff,
+      0xd9,
+    ]);
+  });
+
   it('removes PNG textual metadata chunks', () => {
     const chunk = (type: string, data: number[]) => [
       0,
