@@ -7,7 +7,7 @@ describe('web Worker', () => {
     const response = new Response(JSON.stringify({ rooms: [] }));
     const fetch = vi.fn().mockResolvedValue(response);
 
-    const result = await worker.fetch(request, { API: { fetch } } as never);
+    const result = await worker.fetch(request as never, { API: { fetch } } as never);
 
     expect(fetch).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledWith(request);
