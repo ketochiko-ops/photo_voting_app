@@ -76,8 +76,9 @@ Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは
 9. Cloudflare WAF Rate Limitingで `/api/rooms`、認証、参加、写真、投票、AdminをIP単位で制限する。例として作成10/時、認証60/分、写真120/分を開始値とし、利用状況に合わせる。
 
 Workers BuildsのPreview buildを使う場合、Deploy commandは`npx wrangler preview`とする。
-`wrangler.jsonc`の`previews`設定が`dist`をStatic Assetsとして公開し、`/api/*`だけを
-productionの`photo-voting-api` Service bindingへ中継する。そのためAPI Workerを先にdeployする。
+`wrangler.jsonc`の`previews`は未作成のAPI WorkerがPreviewのdeployを妨げないよう、
+Service bindingを持たない。Previewの`/api/*`は`503`を返すが、Static AssetsはAPI Workerより先に確認できる。
+Productionでは先に`npm run deploy:worker`で`photo-voting-api`を作成し、その後Web Workerをdeployする。
 
 `develop` push/mergeがProduction deploy、PRとその他branchはPages Previewです。GitHub Environmentにもproduction branch ruleとして`develop`だけを許可します。RollbackはCloudflare Deploymentsから直前versionを選び、D1は前方互換migrationを原則とします。破壊的変更はexpand/migrate/contractに分けます。
 

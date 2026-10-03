@@ -15,12 +15,5 @@
       "service": "photo-voting-api",
     },
   ],
-  "previews": {
-    "services": [
-      {
-        "binding": "API",
-        "service": "photo-voting-api",
-      },
-    ],
-  },
+  "previews": {},
 }

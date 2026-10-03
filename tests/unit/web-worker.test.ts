@@ -13,4 +13,16 @@ describe('web Worker', () => {
     expect(fetch).toHaveBeenCalledWith(request);
     expect(result).toBe(response);
   });
+
+  it('returns 503 when a preview has no API service binding', async () => {
+    const request = new Request('https://preview.photo-voting-web.example/api/rooms');
+
+    const result = await worker.fetch(request as never, {});
+
+    expect(result.status).toBe(503);
+    expect(result.headers.get('cache-control')).toBe('no-store');
+    await expect(result.json()).resolves.toEqual({
+      error: 'API service is not available in this preview',
+    });
+  });
 });
