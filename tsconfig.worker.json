@@ -11,5 +11,12 @@
     "types": ["@cloudflare/workers-types", "vitest/globals"],
     "skipLibCheck": true
   },
-  "include": ["worker", "functions", "shared", "tests/unit/**/*.ts", "tests/integration/**/*.ts"]
+  "include": [
+    "worker",
+    "web",
+    "functions",
+    "shared",
+    "tests/unit/**/*.ts",
+    "tests/integration/**/*.ts"
+  ]
 }

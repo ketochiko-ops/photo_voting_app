@@ -31,7 +31,9 @@ FrontendはReact/Vite/Tailwind互換CSS/PWA、BackendはHono Worker、metadata�
 
 ## Local development
 
-Node.js 22.13以上とnpmを使用します。
+Node.js 22.13以上とnpmを使用します。リポジトリ直下の`.node-version`は、
+`package.json` の`engines`を参照しないCloudflare Pagesのbuild imageでも、
+依存関係を対応済みのNode.jsでinstallするために必要です。
 
 ```bash
 npm install
@@ -64,14 +66,19 @@ Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは
 ## Cloudflare setup
 
 1. Cloudflare Accountを用意し、`npx wrangler login`。
-2. `npx wrangler d1 create photo-voting` のIDを`wrangler.toml`へ設定。
+2. `npx wrangler d1 create photo-voting` のIDを`wrangler.worker.toml`へ設定。
 3. `npx wrangler r2 bucket create photo-voting-private`。Custom domain/public development URLを**設定しない**。
 4. 手動でDBだけを更新する場合は`npm run db:migrate:remote`。通常は次の`npm run deploy`が、build、remote migration、Worker deployの順に実行する。
-5. 非秘密limitはvars、将来のsecretは`npx wrangler secret put NAME`で登録する。本物を`.dev.vars.example`へ書かない。
-6. `npm run deploy`でmigrationとWorkerをdeploy。migrationが失敗した場合はWorkerを更新しない。Cron `0 * * * *`は`wrangler.toml`から反映される。
+5. 非秘密limitはvars、将来のsecretは`npx wrangler secret put NAME --config wrangler.worker.toml`で登録する。本物を`.dev.vars.example`へ書かない。
+6. `npm run deploy`でmigrationとAPI Workerをdeploy。migrationが失敗した場合はWorkerを更新しない。Cron `0 * * * *`は`wrangler.worker.toml`から反映される。API Worker用設定はWebの`wrangler.jsonc`と分離している。
 7. R2 DashboardのLifecycle ruleでprefix `rooms/`、60日後deleteを設定する（アプリの最大30日 + cleanup安全margin 30日）。
-8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。PagesのProduction環境に変数名`API`、Service `photo-voting-api`のService bindingを追加する。`functions/api/[[path]].ts`が`/api/*`をsame-originでWorkerへ中継する。
+8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。Node.jsは`.node-version`で固定されるため、Dashboardの`NODE_VERSION`で古いversionを上書きしない。PagesのProduction環境に変数名`API`、Service `photo-voting-api`のService bindingを追加する。`functions/api/[[path]].ts`が`/api/*`をsame-originでWorkerへ中継する。
 9. Cloudflare WAF Rate Limitingで `/api/rooms`、認証、参加、写真、投票、AdminをIP単位で制限する。例として作成10/時、認証60/分、写真120/分を開始値とし、利用状況に合わせる。
+
+Workers BuildsのPreview buildを使う場合、Deploy commandは`npx wrangler preview`とする。
+`wrangler.jsonc`の`previews`は未作成のAPI WorkerがPreviewのdeployを妨げないよう、
+Service bindingを持たない。Previewの`/api/*`は`503`を返すが、Static AssetsはAPI Workerより先に確認できる。
+Productionでは先に`npm run deploy:worker`で`photo-voting-api`を作成し、その後Web Workerをdeployする。
 
 `develop` push/mergeがProduction deploy、PRとその他branchはPages Previewです。GitHub Environmentにもproduction branch ruleとして`develop`だけを許可します。RollbackはCloudflare Deploymentsから直前versionを選び、D1は前方互換migrationを原則とします。破壊的変更はexpand/migrate/contractに分けます。
 
