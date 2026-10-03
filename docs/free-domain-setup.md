@@ -28,7 +28,7 @@ Browser
 2. `workers.dev` routeを有効にする。
 3. `https://photo-voting-api.<account-subdomain>.workers.dev/api/...`へ到達できることを確認する。
 
-`wrangler deploy`時に表示されるURLも記録する。API URLをエンドユーザーへ配布する必要はない。
+`npm run deploy:worker`時に表示されるURLも記録する。このscriptはWorker専用の`wrangler.worker.toml`を明示的に使用する。API URLをエンドユーザーへ配布する必要はない。
 
 ### 2. Pagesプロジェクトを作成する
 
