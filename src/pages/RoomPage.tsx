@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { RoomView, VoteType } from '../../shared/types';
 import { PrivateImage } from '../components/PrivateImage';
+import { ImageViewer } from '../components/ImageViewer';
 import { consumeFragment, participantToken } from '../lib/access';
 import { downloadResults, getRoom, joinRoom, toggleVote, uploadPhotos } from '../lib/api';
 
@@ -17,7 +18,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
     [name, setName] = useState(''),
     [needsName, setNeedsName] = useState(false),
     [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState(''),
+    [selectedPhoto, setSelectedPhoto] = useState<{ id: string; alt: string } | null>(null);
   async function refresh() {
     if (access)
       setRoom(
@@ -170,6 +172,15 @@ export function RoomPage({ roomId }: { roomId: string }) {
           </form>
         </div>
       )}
+      {selectedPhoto && (
+        <ImageViewer
+          roomId={room.id}
+          photoId={selectedPhoto.id}
+          accessKey={access?.key ?? ''}
+          alt={selectedPhoto.alt}
+          onClose={() => setSelectedPhoto(null)}
+        />
+      )}
       <section className="grid">
         {room.photos.length === 0 ? (
           <div className="empty">
@@ -183,12 +194,23 @@ export function RoomPage({ roomId }: { roomId: string }) {
         ) : (
           room.photos.map((photo, index) => (
             <article className="photo" key={photo.id}>
-              <PrivateImage
-                roomId={room.id}
-                photoId={photo.id}
-                accessKey={access?.key ?? ''}
-                alt={`${index + 1}枚目 ${photo.originalFilename}`}
-              />
+              <button
+                className="photo-preview"
+                aria-label={`${photo.originalFilename}を拡大表示`}
+                onClick={() =>
+                  setSelectedPhoto({
+                    id: photo.id,
+                    alt: `${index + 1}枚目 ${photo.originalFilename}`,
+                  })
+                }
+              >
+                <PrivateImage
+                  roomId={room.id}
+                  photoId={photo.id}
+                  accessKey={access?.key ?? ''}
+                  alt={`${index + 1}枚目 ${photo.originalFilename}`}
+                />
+              </button>
               <div>
                 <span>#{index + 1}</span>
                 <small>{photo.originalFilename}</small>

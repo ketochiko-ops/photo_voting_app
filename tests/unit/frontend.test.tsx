@@ -131,5 +131,13 @@ describe('home', () => {
     expect(screen.getByRole('button', { name: 'photo.jpgを掲載不可に投票' })).toHaveTextContent(
       '掲載不可 0',
     );
+
+    await userEvent.click(screen.getByRole('button', { name: 'photo.jpgを拡大表示' }));
+    expect(screen.getByRole('dialog', { name: '1枚目 photo.jpgの拡大表示' })).toBeVisible();
+    expect(screen.getByText('100%')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: '拡大' }));
+    expect(screen.getByText('150%')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: '閉じる' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
