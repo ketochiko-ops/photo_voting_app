@@ -39,7 +39,8 @@ export function HomePage() {
           <br />
           <em>支援アプリ</em>
         </h1>
-        <p>大量の写真から掲載候補を、仲間だけで安全に選定。登録不要、期限が来たら自動削除。</p>
+        <p>大量の写真から掲載候補を、仲間だけで安全に選べます。</p>
+        <p>登録不要かつ、期限が来たら自動削除されます。</p>
         <button className="primary" onClick={() => setOpen(true)}>
           写真選定ルームを作成
         </button>
@@ -55,6 +56,15 @@ export function HomePage() {
             </span>
             <h2 id="announcements-title">お知らせ</h2>
           </div>
+          <article>
+            <time dateTime="2026-10-05">2026.10.05</time>
+            <div>
+              <strong>画像拡大機能実装</strong>
+              <p>
+                各ルームの写真をタップ（クリック）すると、その写真全体を表示でき/nピンチ操作やボタン操作でさらに拡大できます。
+              </p>
+            </div>
+          </article>
           <article>
             <time dateTime="2026-10-04">2026.10.04</time>
             <div>
