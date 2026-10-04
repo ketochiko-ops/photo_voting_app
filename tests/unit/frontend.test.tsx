@@ -3,6 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePage } from '../../src/pages/HomePage';
+import { RoomPage } from '../../src/pages/RoomPage';
 describe('home', () => {
   afterEach(cleanup);
 
@@ -54,5 +55,31 @@ describe('home', () => {
     expect(writeText).toHaveBeenLastCalledWith(`${location.origin}/r/room-1#k=share-key`);
     await user.click(screen.getByRole('button', { name: '管理者URLをコピー' }));
     expect(writeText).toHaveBeenLastCalledWith(`${location.origin}/r/room-1#admin=admin-key`);
+  });
+
+  it('shows the admin panel and text export in an admin room', async () => {
+    sessionStorage.setItem(
+      'room-access:room-admin',
+      JSON.stringify({ key: 'admin-key', role: 'admin' }),
+    );
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'room-admin',
+          title: '管理ルーム',
+          expiresAt: '2099-01-01T00:00:00Z',
+          role: 'admin',
+          participantCount: 2,
+          photos: [],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    render(<RoomPage roomId="room-admin" />);
+
+    expect(await screen.findByRole('heading', { name: '管理者パネル' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '投票結果をテキスト出力' })).toBeVisible();
+    expect(screen.getByText('写真を追加')).toBeVisible();
   });
 });

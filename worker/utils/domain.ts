@@ -28,3 +28,10 @@ export function createResultsCsv(photos: PhotoSummary[], participants: number): 
     ),
   ].join('\n');
 }
+
+export function createResultsText(photos: PhotoSummary[]): string {
+  return [
+    'ファイル名\t投票数',
+    ...photos.map((photo) => `${photo.originalFilename.replaceAll('\t', ' ')}\t${photo.voteCount}`),
+  ].join('\n');
+}

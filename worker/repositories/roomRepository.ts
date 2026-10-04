@@ -34,6 +34,13 @@ export class RoomRepository {
       .first<{ count: number }>();
     return row?.count ?? 0;
   }
+  async voteCounts(roomId: string): Promise<Map<string, number>> {
+    const result = await this.db
+      .prepare('SELECT photo_id,COUNT(*) count FROM votes WHERE room_id=? GROUP BY photo_id')
+      .bind(roomId)
+      .all<{ photo_id: string; count: number }>();
+    return new Map(result.results.map((vote) => [vote.photo_id, vote.count]));
+  }
   async expired(now: string): Promise<RoomRow[]> {
     const result = await this.db
       .prepare("SELECT * FROM rooms WHERE expires_at<=? OR status='deleting'")

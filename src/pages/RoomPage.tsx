@@ -2,19 +2,35 @@ import { useEffect, useState } from 'react';
 import type { RoomView } from '../../shared/types';
 import { PrivateImage } from '../components/PrivateImage';
 import { consumeFragment, participantToken } from '../lib/access';
-import { getRoom, joinRoom } from '../lib/api';
+import { downloadResults, getRoom, joinRoom, toggleVote, uploadPhotos } from '../lib/api';
 export function RoomPage({ roomId }: { roomId: string }) {
   const [access] = useState(() => consumeFragment(roomId)),
     [room, setRoom] = useState<RoomView | null>(null),
     [error, setError] = useState(''),
     [name, setName] = useState(''),
-    [needsName, setNeedsName] = useState(false);
+    [needsName, setNeedsName] = useState(false),
+    [busy, setBusy] = useState(false),
+    [notice, setNotice] = useState('');
+  async function refresh() {
+    if (access)
+      setRoom(
+        await getRoom(
+          roomId,
+          access.key,
+          access.role === 'participant' ? participantToken(roomId) : undefined,
+        ),
+      );
+  }
   useEffect(() => {
     if (!access) {
       setError('参加URLまたは管理者URLからアクセスしてください');
       return;
     }
-    getRoom(roomId, access.key)
+    getRoom(
+      roomId,
+      access.key,
+      access.role === 'participant' ? participantToken(roomId) : undefined,
+    )
       .then((value) => {
         setRoom(value);
         if (value.role === 'participant' && !localStorage.getItem(`participant-name:${roomId}`))
@@ -28,6 +44,33 @@ export function RoomPage({ roomId }: { roomId: string }) {
     await joinRoom(roomId, access.key, name, participantToken(roomId));
     localStorage.setItem(`participant-name:${roomId}`, name);
     setNeedsName(false);
+  }
+  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!access || !e.target.files?.length) return;
+    setBusy(true);
+    setNotice('');
+    try {
+      await uploadPhotos(roomId, access.key, [...e.target.files]);
+      await refresh();
+      setNotice('写真を追加しました');
+      e.target.value = '';
+    } catch (uploadError) {
+      setNotice(uploadError instanceof Error ? uploadError.message : '写真の追加に失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function vote(photoId: string) {
+    if (!access || room?.role !== 'participant') return;
+    setBusy(true);
+    try {
+      await toggleVote(roomId, photoId, access.key, participantToken(roomId));
+      await refresh();
+    } catch (voteError) {
+      setNotice(voteError instanceof Error ? voteError.message : '投票に失敗しました');
+    } finally {
+      setBusy(false);
+    }
   }
   if (error)
     return (
@@ -51,6 +94,44 @@ export function RoomPage({ roomId }: { roomId: string }) {
         </div>
         <div>{room.participantCount}人参加</div>
       </header>
+      {room.role === 'admin' && (
+        <section className="admin-panel" aria-labelledby="admin-panel-title">
+          <div>
+            <span className="eyebrow">ADMIN</span>
+            <h2 id="admin-panel-title">管理者パネル</h2>
+            <p>写真の追加と、ファイル名・投票数をまとめたテキストの出力ができます。</p>
+          </div>
+          <div className="admin-actions">
+            <label className="primary upload-button">
+              {busy ? '処理中…' : '写真を追加'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                disabled={busy}
+                onChange={upload}
+              />
+            </label>
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() =>
+                access &&
+                downloadResults(roomId, access.key).catch(() =>
+                  setNotice('投票結果の出力に失敗しました'),
+                )
+              }
+            >
+              投票結果をテキスト出力
+            </button>
+          </div>
+          {notice && (
+            <p className="admin-notice" role="status">
+              {notice}
+            </p>
+          )}
+        </section>
+      )}
       {needsName && (
         <div className="dialog-backdrop">
           <form className="dialog" role="dialog" onSubmit={join}>
@@ -88,7 +169,14 @@ export function RoomPage({ roomId }: { roomId: string }) {
               <div>
                 <span>#{index + 1}</span>
                 <small>{photo.originalFilename}</small>
-                <button aria-pressed={photo.votedByMe}>♡ {photo.voteCount}</button>
+                <button
+                  aria-label={`${photo.originalFilename}に投票`}
+                  aria-pressed={photo.votedByMe}
+                  disabled={busy || room.role === 'admin'}
+                  onClick={() => vote(photo.id)}
+                >
+                  {photo.votedByMe ? '♥' : '♡'} {photo.voteCount}
+                </button>
               </div>
             </article>
           ))
