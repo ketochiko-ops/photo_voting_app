@@ -29,6 +29,7 @@ textarea {
 .hero {
   max-width: 780px;
   text-align: center;
+  padding: 56px 0;
 }
 .eyebrow {
   color: #a1a1aa;
@@ -73,6 +74,63 @@ textarea {
   color: #71717a;
   font-size: 0.8rem;
 }
+.announcements {
+  margin: 48px auto 0;
+  max-width: 640px;
+  border: 1px solid #3f3f46;
+  border-radius: 18px;
+  background: #18181bcc;
+  padding: 22px 24px;
+  text-align: left;
+}
+.announcements-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #3f3f46;
+}
+.announcements-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.announcements-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #71717a;
+  border-radius: 50%;
+  color: #d4d4d8;
+  font-family: serif;
+  font-weight: 700;
+}
+.announcements article {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #27272a;
+}
+.announcements time {
+  color: #71717a;
+  font-size: 0.82rem;
+}
+.announcements article p,
+.announcements .contact {
+  max-width: none;
+  margin: 6px 0 0;
+  color: #a1a1aa;
+  font-size: 0.88rem;
+  line-height: 1.65;
+}
+.announcements .contact {
+  margin-top: 18px;
+}
+.announcements a {
+  color: #f4f4f5;
+  text-underline-offset: 3px;
+}
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -112,6 +170,27 @@ textarea {
 }
 .dialog textarea {
   min-height: 82px;
+}
+.copy-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: -10px;
+  border: 1px solid #52525b;
+  border-radius: 10px;
+  background: #27272a;
+  color: #fafafa;
+  font-weight: 700;
+  cursor: pointer;
+}
+.copy-button:hover {
+  background: #3f3f46;
+}
+.copy-status {
+  min-height: 1.4em;
+  margin-bottom: 0;
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  text-align: center;
 }
 .close {
   position: absolute;
@@ -204,6 +283,10 @@ textarea {
   }
   .hero h1 {
     font-size: 2.9rem;
+  }
+  .announcements article {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }
 .image-placeholder {

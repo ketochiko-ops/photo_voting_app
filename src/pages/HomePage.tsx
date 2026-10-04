@@ -6,6 +6,7 @@ export function HomePage() {
     [title, setTitle] = useState(''),
     [days, setDays] = useState<RetentionDays>(7),
     [created, setCreated] = useState<CreatedRoom | null>(null),
+    [copied, setCopied] = useState<'participant' | 'admin' | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   async function submit(event: React.FormEvent) {
@@ -21,14 +22,22 @@ export function HomePage() {
     }
   }
   const base = location.origin;
+  const participantUrl = created
+    ? `${base}/r/${created.roomId}#k=${created.participantAccessKey}`
+    : '';
+  const adminUrl = created ? `${base}/r/${created.roomId}#admin=${created.adminKey}` : '';
+  async function copyUrl(kind: 'participant' | 'admin', url: string) {
+    await navigator.clipboard.writeText(url);
+    setCopied(kind);
+  }
   return (
     <main className="shell">
       <section className="hero">
         <span className="eyebrow">PRIVATE · TEMPORARY · SIMPLE</span>
         <h1>
-          みんなの一票で、
+          併せ写真アップ
           <br />
-          <em>残したい瞬間</em>を選ぶ。
+          <em>支援アプリ</em>
         </h1>
         <p>大量の写真から掲載候補を、仲間だけで安全に選定。登録不要、期限が来たら自動削除。</p>
         <button className="primary" onClick={() => setOpen(true)}>
@@ -39,6 +48,28 @@ export function HomePage() {
           <span>◷ 自動削除</span>
           <span>✓ 登録不要</span>
         </div>
+        <aside className="announcements" aria-labelledby="announcements-title">
+          <div className="announcements-heading">
+            <span className="announcements-icon" aria-hidden="true">
+              i
+            </span>
+            <h2 id="announcements-title">お知らせ</h2>
+          </div>
+          <article>
+            <time dateTime="2026-10-04">2026.10.04</time>
+            <div>
+              <strong>サービスをリリースしました</strong>
+              <p>リリースノートやメンテナンス情報をこちらでお知らせします。</p>
+            </div>
+          </article>
+          <p className="contact">
+            不具合情報・改修要望は
+            <a href="https://x.com/03St_akisame" target="_blank" rel="noreferrer">
+              X（@03St_akisame）
+            </a>
+            へDMでお送りください。
+          </p>
+        </aside>
       </section>
       {open && (
         <div className="dialog-backdrop">
@@ -56,19 +87,30 @@ export function HomePage() {
               <div className="links">
                 <p>この画面でのみ秘密鍵を確認できます。安全な方法で共有してください。</p>
                 <label>
-                  参加者URL
-                  <textarea
-                    readOnly
-                    value={`${base}/r/${created.roomId}#k=${created.participantAccessKey}`}
-                  />
+                  共有用URL
+                  <textarea readOnly value={participantUrl} />
                 </label>
+                <button
+                  type="button"
+                  className="copy-button"
+                  onClick={() => copyUrl('participant', participantUrl)}
+                >
+                  {copied === 'participant' ? 'コピーしました' : '共有用URLをコピー'}
+                </button>
                 <label>
                   管理者URL
-                  <textarea
-                    readOnly
-                    value={`${base}/r/${created.roomId}#admin=${created.adminKey}`}
-                  />
+                  <textarea readOnly value={adminUrl} />
                 </label>
+                <button
+                  type="button"
+                  className="copy-button"
+                  onClick={() => copyUrl('admin', adminUrl)}
+                >
+                  {copied === 'admin' ? 'コピーしました' : '管理者URLをコピー'}
+                </button>
+                <p className="copy-status" aria-live="polite">
+                  {copied && `${copied === 'admin' ? '管理者' : '共有用'}URLをコピーしました。`}
+                </p>
               </div>
             ) : (
               <form onSubmit={submit}>
