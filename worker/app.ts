@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
-import type { CreatedRoom, RetentionDays } from '../shared/types';
-import { retentionDays } from '../shared/types';
+import { createResultContentDisposition } from '../shared/results';
+import type { CreatedRoom, RetentionDays, VoteState, VoteType } from '../shared/types';
+import { retentionDays, voteTypes } from '../shared/types';
 import { RoomRepository } from './repositories/roomRepository';
 import { authenticateRoom } from './services/authService';
 import { cleanupRoom } from './services/cleanupService';
@@ -39,6 +40,12 @@ const genericAuthError = (c: Context<{ Bindings: Env; Variables: Variables }>) =
 function validTitle(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 100;
 }
+const emptyVoteState = (): VoteState => ({ favorite: 0, recommendation: 0, unpublishable: 0 });
+const emptyMyVoteState = () => ({
+  favorite: false,
+  recommendation: false,
+  unpublishable: false,
+});
 
 app.post('/api/rooms', async (c) => {
   const body: { title?: unknown; retentionDays?: unknown } = await c.req.json().catch(() => ({}));
@@ -80,7 +87,7 @@ app.get('/api/rooms/:roomId', async (c) => {
   if (!room || !role) return genericAuthError(c);
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
-    participantCount = await repo.participantCount(room.id),
+    participants = await repo.participants(room.id),
     voteCounts = await repo.voteCounts(room.id);
   const participantToken = c.req.header('X-Participant-Token');
   let myVotes = new Set<string>();
@@ -91,10 +98,12 @@ app.get('/api/rooms/:roomId', async (c) => {
       .bind(room.id, await hashSecret(participantToken))
       .first<{ id: string }>();
     if (participant) {
-      const result = await c.env.DB.prepare('SELECT photo_id FROM votes WHERE participant_id=?')
+      const result = await c.env.DB.prepare(
+        'SELECT photo_id,vote_type FROM votes WHERE participant_id=?',
+      )
         .bind(participant.id)
-        .all<{ photo_id: string }>();
-      myVotes = new Set(result.results.map((vote) => vote.photo_id));
+        .all<{ photo_id: string; vote_type: VoteType }>();
+      myVotes = new Set(result.results.map((vote) => `${vote.photo_id}:${vote.vote_type}`));
     }
   }
   return c.json({
@@ -102,15 +111,20 @@ app.get('/api/rooms/:roomId', async (c) => {
     title: room.title,
     expiresAt: room.expires_at,
     role,
-    participantCount,
+    participantCount: participants.length,
+    participants,
     photos: photos.map((p) => ({
       id: p.id,
       originalFilename: p.original_filename,
       width: p.width,
       height: p.height,
       sortOrder: p.sort_order,
-      voteCount: voteCounts.get(p.id) ?? 0,
-      votedByMe: myVotes.has(p.id),
+      voteCounts: voteCounts.get(p.id) ?? emptyVoteState(),
+      votedByMe: {
+        favorite: myVotes.has(`${p.id}:favorite`),
+        recommendation: myVotes.has(`${p.id}:recommendation`),
+        unpublishable: myVotes.has(`${p.id}:unpublishable`),
+      },
     })),
   });
 });
@@ -209,8 +223,16 @@ app.get('/api/rooms/:roomId/photos/:photoId/content', async (c) => {
 app.put('/api/rooms/:roomId/photos/:photoId/vote', async (c) => {
   const { room, role } = await auth(c);
   if (!room || !role) return genericAuthError(c);
-  const body: { participantToken?: string } = await c.req.json().catch(() => ({}));
-  if (!body.participantToken) return genericAuthError(c);
+  const body: { participantToken?: string; voteType?: unknown } = await c.req
+    .json()
+    .catch(() => ({}));
+  if (
+    !body.participantToken ||
+    typeof body.voteType !== 'string' ||
+    !voteTypes.includes(body.voteType as VoteType)
+  )
+    return genericAuthError(c);
+  const voteType = body.voteType as VoteType;
   const participant = await c.env.DB.prepare(
     'SELECT id FROM participants WHERE room_id=? AND participant_token_hash=?',
   )
@@ -221,20 +243,22 @@ app.put('/api/rooms/:roomId/photos/:photoId/vote', async (c) => {
     .first<{ id: string }>();
   if (!participant || !photo) return genericAuthError(c);
   const existing = await c.env.DB.prepare(
-    'SELECT 1 present FROM votes WHERE photo_id=? AND participant_id=?',
+    'SELECT 1 present FROM votes WHERE photo_id=? AND participant_id=? AND vote_type=?',
   )
-    .bind(photo.id, participant.id)
+    .bind(photo.id, participant.id, voteType)
     .first();
   if (existing) {
-    await c.env.DB.prepare('DELETE FROM votes WHERE photo_id=? AND participant_id=?')
-      .bind(photo.id, participant.id)
+    await c.env.DB.prepare(
+      'DELETE FROM votes WHERE photo_id=? AND participant_id=? AND vote_type=?',
+    )
+      .bind(photo.id, participant.id, voteType)
       .run();
     return c.json({ voted: false });
   }
   await c.env.DB.prepare(
-    'INSERT INTO votes(room_id,photo_id,participant_id,created_at) VALUES(?,?,?,?)',
+    'INSERT INTO votes(room_id,photo_id,participant_id,vote_type,created_at) VALUES(?,?,?,?,?)',
   )
-    .bind(room.id, photo.id, participant.id, new Date().toISOString())
+    .bind(room.id, photo.id, participant.id, voteType, new Date().toISOString())
     .run();
   return c.json({ voted: true });
 });
@@ -243,7 +267,7 @@ app.get('/api/rooms/:roomId/admin/results.csv', async (c) => {
   if (!room || !role) return genericAuthError(c);
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
-    participants = await repo.participantCount(room.id);
+    participants = await repo.participants(room.id);
   const byId = await repo.voteCounts(room.id);
   const csv = createResultsCsv(
     photos.map((p) => ({
@@ -252,14 +276,14 @@ app.get('/api/rooms/:roomId/admin/results.csv', async (c) => {
       width: p.width,
       height: p.height,
       sortOrder: p.sort_order,
-      voteCount: byId.get(p.id) ?? 0,
-      votedByMe: false,
+      voteCounts: byId.get(p.id) ?? emptyVoteState(),
+      votedByMe: emptyMyVoteState(),
     })),
     participants,
   );
   return c.text(csv, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
-    'Content-Disposition': 'attachment; filename="results.csv"',
+    'Content-Disposition': createResultContentDisposition(room.title, 'csv'),
   });
 });
 app.get('/api/rooms/:roomId/admin/results.txt', async (c) => {
@@ -267,6 +291,7 @@ app.get('/api/rooms/:roomId/admin/results.txt', async (c) => {
   if (!room || !role) return genericAuthError(c);
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
+    participants = await repo.participants(room.id),
     byId = await repo.voteCounts(room.id);
   const text = createResultsText(
     photos.map((photo) => ({
@@ -275,13 +300,14 @@ app.get('/api/rooms/:roomId/admin/results.txt', async (c) => {
       width: photo.width,
       height: photo.height,
       sortOrder: photo.sort_order,
-      voteCount: byId.get(photo.id) ?? 0,
-      votedByMe: false,
+      voteCounts: byId.get(photo.id) ?? emptyVoteState(),
+      votedByMe: emptyMyVoteState(),
     })),
+    participants,
   );
   return c.text(text, 200, {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Content-Disposition': 'attachment; filename="results.txt"',
+    'Content-Disposition': createResultContentDisposition(room.title, 'txt'),
   });
 });
 app.delete('/api/rooms/:roomId', async (c) => {

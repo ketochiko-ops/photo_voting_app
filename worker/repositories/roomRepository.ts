@@ -1,4 +1,8 @@
+import type { ParticipantSummary, VoteState, VoteType } from '../../shared/types';
 import type { PhotoRow, RoomRow } from '../types';
+
+const emptyVoteState = (): VoteState => ({ favorite: 0, recommendation: 0, unpublishable: 0 });
+
 export class RoomRepository {
   constructor(private readonly db: D1Database) {}
   async create(room: RoomRow): Promise<void> {
@@ -34,12 +38,30 @@ export class RoomRepository {
       .first<{ count: number }>();
     return row?.count ?? 0;
   }
-  async voteCounts(roomId: string): Promise<Map<string, number>> {
+  async participants(roomId: string): Promise<ParticipantSummary[]> {
     const result = await this.db
-      .prepare('SELECT photo_id,COUNT(*) count FROM votes WHERE room_id=? GROUP BY photo_id')
+      .prepare('SELECT id,display_name FROM participants WHERE room_id=? ORDER BY created_at,id')
       .bind(roomId)
-      .all<{ photo_id: string; count: number }>();
-    return new Map(result.results.map((vote) => [vote.photo_id, vote.count]));
+      .all<{ id: string; display_name: string }>();
+    return result.results.map((participant) => ({
+      id: participant.id,
+      displayName: participant.display_name,
+    }));
+  }
+  async voteCounts(roomId: string): Promise<Map<string, VoteState>> {
+    const result = await this.db
+      .prepare(
+        'SELECT photo_id,vote_type,COUNT(*) count FROM votes WHERE room_id=? GROUP BY photo_id,vote_type',
+      )
+      .bind(roomId)
+      .all<{ photo_id: string; vote_type: VoteType; count: number }>();
+    const counts = new Map<string, VoteState>();
+    for (const vote of result.results) {
+      const state = counts.get(vote.photo_id) ?? emptyVoteState();
+      state[vote.vote_type] = vote.count;
+      counts.set(vote.photo_id, state);
+    }
+    return counts;
   }
   async expired(now: string): Promise<RoomRow[]> {
     const result = await this.db
