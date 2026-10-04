@@ -1,4 +1,5 @@
-import type { CreatedRoom, RetentionDays, RoomView } from '../../shared/types';
+import type { CreatedRoom, RetentionDays, RoomView, VoteType } from '../../shared/types';
+import { createResultFilename } from '../../shared/results';
 async function parse<T>(response: Response): Promise<T> {
   if (!response.ok)
     throw new Error(response.status === 404 ? 'ルームを利用できません' : '操作に失敗しました');
@@ -55,6 +56,7 @@ export async function toggleVote(
   photoId: string,
   key: string,
   token: string,
+  voteType: VoteType,
 ): Promise<void> {
   await parse(
     await fetch(
@@ -62,12 +64,16 @@ export async function toggleVote(
       {
         method: 'PUT',
         headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantToken: token }),
+        body: JSON.stringify({ participantToken: token, voteType }),
       },
     ),
   );
 }
-export async function downloadResults(roomId: string, key: string): Promise<void> {
+export async function downloadResults(
+  roomId: string,
+  roomTitle: string,
+  key: string,
+): Promise<void> {
   const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/admin/results.txt`, {
     headers: { Authorization: `Bearer ${key}` },
   });
@@ -75,7 +81,7 @@ export async function downloadResults(roomId: string, key: string): Promise<void
   const url = URL.createObjectURL(await response.blob());
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = `results-${roomId}.txt`;
+  anchor.download = createResultFilename(roomTitle, 'txt');
   anchor.click();
   URL.revokeObjectURL(url);
 }

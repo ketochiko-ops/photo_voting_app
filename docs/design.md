@@ -19,16 +19,17 @@ Roomを`deleting`にして新規アクセスを止め、R2 prefixを全削除し
 
 ## API
 
-| Method | Path                                         | Authority           | Purpose       |
-| ------ | -------------------------------------------- | ------------------- | ------------- |
-| POST   | `/api/rooms`                                 | public + rate limit | Room作成      |
-| GET    | `/api/rooms/:roomId`                         | participant/admin   | Room/写真一覧 |
-| POST   | `/api/rooms/:roomId/participants`            | participant/admin   | 参加/再訪     |
-| POST   | `/api/rooms/:roomId/photos`                  | admin               | 写真Upload    |
-| GET    | `/api/rooms/:roomId/photos/:photoId/content` | participant/admin   | private image |
-| PUT    | `/api/rooms/:roomId/photos/:photoId/vote`    | participant/admin   | vote toggle   |
-| GET    | `/api/rooms/:roomId/admin/results.csv`       | admin               | CSV           |
-| DELETE | `/api/rooms/:roomId`                         | admin               | 即時削除      |
+| Method | Path                                         | Authority           | Purpose           |
+| ------ | -------------------------------------------- | ------------------- | ----------------- |
+| POST   | `/api/rooms`                                 | public + rate limit | Room作成          |
+| GET    | `/api/rooms/:roomId`                         | participant/admin   | Room/写真一覧     |
+| POST   | `/api/rooms/:roomId/participants`            | participant/admin   | 参加/再訪         |
+| POST   | `/api/rooms/:roomId/photos`                  | admin               | 写真Upload        |
+| GET    | `/api/rooms/:roomId/photos/:photoId/content` | participant/admin   | private image     |
+| PUT    | `/api/rooms/:roomId/photos/:photoId/vote`    | participant/admin   | 種別別vote toggle |
+| GET    | `/api/rooms/:roomId/admin/results.csv`       | admin               | CSV               |
+| GET    | `/api/rooms/:roomId/admin/results.txt`       | admin               | text              |
+| DELETE | `/api/rooms/:roomId`                         | admin               | 即時削除          |
 
 ## Test strategy / phases
 
