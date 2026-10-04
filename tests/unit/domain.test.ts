@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createResultsCsv, isExpired, sortPhotos, voteRate } from '../../worker/utils/domain';
+import {
+  createResultsCsv,
+  createResultsText,
+  isExpired,
+  sortPhotos,
+  voteRate,
+} from '../../worker/utils/domain';
 const photos = [
   {
     id: 'a',
@@ -39,6 +45,8 @@ describe('voting domain', () => {
     expect(sortPhotos(photos, 'mine').map((p) => p.id)).toEqual(['a', 'c']);
   });
   it('escapes CSV', () => expect(createResultsCsv(photos, 4)).toContain('"b,2.jpg"'));
+  it('creates text results with filenames and vote counts', () =>
+    expect(createResultsText(photos)).toContain('b,2.jpg\t3'));
   it('detects expiration at the boundary', () =>
     expect(isExpired('2025-01-01T00:00:00Z', new Date('2025-01-01T00:00:00Z'))).toBe(true));
 });

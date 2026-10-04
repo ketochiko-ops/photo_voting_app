@@ -13,10 +13,13 @@ export async function createRoom(title: string, days: RetentionDays): Promise<Cr
     }),
   );
 }
-export async function getRoom(roomId: string, key: string): Promise<RoomView> {
+export async function getRoom(roomId: string, key: string, token?: string): Promise<RoomView> {
   return parse(
     await fetch(`/api/rooms/${encodeURIComponent(roomId)}`, {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: {
+        Authorization: `Bearer ${key}`,
+        ...(token ? { 'X-Participant-Token': token } : {}),
+      },
     }),
   );
 }
@@ -33,4 +36,46 @@ export async function joinRoom(
       body: JSON.stringify({ displayName, participantToken }),
     }),
   );
+}
+export async function uploadPhotos(roomId: string, key: string, files: File[]): Promise<void> {
+  for (const file of files) {
+    const form = new FormData();
+    form.set('photo', file);
+    await parse(
+      await fetch(`/api/rooms/${encodeURIComponent(roomId)}/photos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+      }),
+    );
+  }
+}
+export async function toggleVote(
+  roomId: string,
+  photoId: string,
+  key: string,
+  token: string,
+): Promise<void> {
+  await parse(
+    await fetch(
+      `/api/rooms/${encodeURIComponent(roomId)}/photos/${encodeURIComponent(photoId)}/vote`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantToken: token }),
+      },
+    ),
+  );
+}
+export async function downloadResults(roomId: string, key: string): Promise<void> {
+  const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/admin/results.txt`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!response.ok) throw new Error('投票結果の出力に失敗しました');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `results-${roomId}.txt`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

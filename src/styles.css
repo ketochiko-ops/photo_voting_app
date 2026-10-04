@@ -226,6 +226,58 @@ textarea {
 .room h1 {
   margin: 0.5rem 0 0;
 }
+.admin-panel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-top: 24px;
+  padding: 22px;
+  border: 1px solid #3f3f46;
+  border-radius: 16px;
+  background: #18181b;
+}
+.admin-panel h2 {
+  margin: 5px 0;
+}
+.admin-panel p {
+  margin: 0;
+  color: #a1a1aa;
+}
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.upload-button {
+  display: grid;
+  place-items: center;
+}
+.upload-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.secondary {
+  min-height: 52px;
+  padding: 0 20px;
+  border: 1px solid #52525b;
+  border-radius: 14px;
+  background: #27272a;
+  color: #fafafa;
+  font-weight: 700;
+  cursor: pointer;
+}
+.secondary:disabled,
+.upload-button:has(input:disabled) {
+  opacity: 0.55;
+}
+.admin-panel .admin-notice {
+  flex-basis: 100%;
+  color: #d4d4d8;
+}
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

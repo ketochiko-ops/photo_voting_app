@@ -6,7 +6,7 @@ import { RoomRepository } from './repositories/roomRepository';
 import { authenticateRoom } from './services/authService';
 import { cleanupRoom } from './services/cleanupService';
 import type { Env, PhotoRow } from './types';
-import { createResultsCsv } from './utils/domain';
+import { createResultsCsv, createResultsText } from './utils/domain';
 import { validateImage } from './utils/image';
 import {
   generateAccessKey,
@@ -80,7 +80,23 @@ app.get('/api/rooms/:roomId', async (c) => {
   if (!room || !role) return genericAuthError(c);
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
-    participantCount = await repo.participantCount(room.id);
+    participantCount = await repo.participantCount(room.id),
+    voteCounts = await repo.voteCounts(room.id);
+  const participantToken = c.req.header('X-Participant-Token');
+  let myVotes = new Set<string>();
+  if (role === 'participant' && participantToken) {
+    const participant = await c.env.DB.prepare(
+      'SELECT id FROM participants WHERE room_id=? AND participant_token_hash=?',
+    )
+      .bind(room.id, await hashSecret(participantToken))
+      .first<{ id: string }>();
+    if (participant) {
+      const result = await c.env.DB.prepare('SELECT photo_id FROM votes WHERE participant_id=?')
+        .bind(participant.id)
+        .all<{ photo_id: string }>();
+      myVotes = new Set(result.results.map((vote) => vote.photo_id));
+    }
+  }
   return c.json({
     id: room.id,
     title: room.title,
@@ -93,8 +109,8 @@ app.get('/api/rooms/:roomId', async (c) => {
       width: p.width,
       height: p.height,
       sortOrder: p.sort_order,
-      voteCount: 0,
-      votedByMe: false,
+      voteCount: voteCounts.get(p.id) ?? 0,
+      votedByMe: myVotes.has(p.id),
     })),
   });
 });
@@ -228,12 +244,7 @@ app.get('/api/rooms/:roomId/admin/results.csv', async (c) => {
   const repo = new RoomRepository(c.env.DB),
     photos = await repo.photos(room.id),
     participants = await repo.participantCount(room.id);
-  const counts = await c.env.DB.prepare(
-    'SELECT photo_id,COUNT(*) count FROM votes WHERE room_id=? GROUP BY photo_id',
-  )
-    .bind(room.id)
-    .all<{ photo_id: string; count: number }>();
-  const byId = new Map(counts.results.map((v) => [v.photo_id, v.count]));
+  const byId = await repo.voteCounts(room.id);
   const csv = createResultsCsv(
     photos.map((p) => ({
       id: p.id,
@@ -249,6 +260,28 @@ app.get('/api/rooms/:roomId/admin/results.csv', async (c) => {
   return c.text(csv, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="results.csv"',
+  });
+});
+app.get('/api/rooms/:roomId/admin/results.txt', async (c) => {
+  const { room, role } = await auth(c, 'admin');
+  if (!room || !role) return genericAuthError(c);
+  const repo = new RoomRepository(c.env.DB),
+    photos = await repo.photos(room.id),
+    byId = await repo.voteCounts(room.id);
+  const text = createResultsText(
+    photos.map((photo) => ({
+      id: photo.id,
+      originalFilename: photo.original_filename,
+      width: photo.width,
+      height: photo.height,
+      sortOrder: photo.sort_order,
+      voteCount: byId.get(photo.id) ?? 0,
+      votedByMe: false,
+    })),
+  );
+  return c.text(text, 200, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="results.txt"',
   });
 });
 app.delete('/api/rooms/:roomId', async (c) => {
