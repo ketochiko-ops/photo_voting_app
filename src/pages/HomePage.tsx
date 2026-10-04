@@ -39,8 +39,9 @@ export function HomePage() {
           <br />
           <em>支援アプリ</em>
         </h1>
-        <p>大量の写真から掲載候補を、仲間だけで安全に選べます。</p>
-        <p>登録不要かつ、期限が来たら自動削除されます。</p>
+        <p>
+          大量の写真から掲載候補を、仲間だけで安全に選べます。登録不要かつ、期限が来たら自動削除されます。
+        </p>
         <button className="primary" onClick={() => setOpen(true)}>
           写真選定ルームを作成
         </button>
