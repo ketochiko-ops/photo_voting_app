@@ -75,6 +75,14 @@ Unitはpure domain/security、Integrationはroute/service + D1/R2境界、E2Eは
 8. PagesをGitHub repositoryへ接続し、Build commandを`npm run build`、outputを`dist`、**Production branchを`develop`**へ設定する。Node.jsは`.node-version`で固定されるため、Dashboardの`NODE_VERSION`で古いversionを上書きしない。PagesのProduction環境に変数名`API`、Service `photo-voting-api`のService bindingを追加する。`functions/api/[[path]].ts`が`/api/*`をsame-originでWorkerへ中継する。
 9. Cloudflare WAF Rate Limitingで `/api/rooms`、認証、参加、写真、投票、AdminをIP単位で制限する。例として作成10/時、認証60/分、写真120/分を開始値とし、利用状況に合わせる。
 
+### 無料枠の使用量警告
+
+GitHub Actionsの`Cloudflare usage alert`は毎時、アカウント全体のWorkersリクエスト数、D1読み取り行数、D1書き込み行数をCloudflare Analytics GraphQL APIから取得します。日次無料枠の50%、80%、90%に到達すると、それぞれ一度だけGitHub Issueを作成します。Repositoryをwatchしている開発者にはGitHubの通知設定に従ってメール通知されます。
+
+有効化にはRepository secret `CLOUDFLARE_ANALYTICS_API_TOKEN`（Cloudflareの`Account Analytics: Read`権限）を追加してください。既存の`CLOUDFLARE_ACCOUNT_ID`も利用します。`ketochiko@gmail.com`へ届ける場合は、該当GitHubアカウントの通知先メールを同アドレスに設定し、このRepositoryをwatchしてください。
+
+この監視値はCloudflareアカウント全体で共有される日次枠（00:00 UTCリセット）が対象です。R2の無料枠は月次かつGB-monthで集計方法が異なるため、このWorkflowの対象外です。Cloudflare DashboardのR2 MetricsとBillingも月次で確認してください。
+
 Workers BuildsのPreview buildを使う場合、Deploy commandは`npx wrangler preview`とする。
 `wrangler.jsonc`の`previews`は未作成のAPI WorkerがPreviewのdeployを妨げないよう、
 Service bindingを持たない。Previewの`/api/*`は`503`を返すが、Static AssetsはAPI Workerより先に確認できる。
